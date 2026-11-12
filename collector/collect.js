@@ -27,6 +27,7 @@ function ingest(state, payload) {
       const key = it.id + '|' + cc;
       const rec = state.items[key] || (state.items[key] = { delays: [] });
       rec.delays = rec.delays || [];
+      rec.spans = rec.spans || [];   // how long each batch lasted (restock -> sold out)
       rec.name = it.name; rec.id = it.id; rec.cc = cc; rec.cost = Number(it.cost) || 0;
       const q = Number(it.quantity) || 0;
       if (rec.t === upd) continue;                       // same sighting as last time
@@ -47,17 +48,27 @@ function ingest(state, payload) {
             }
           }
           rec.lastRestock = Math.round(restockT);
+          rec.lrU = Math.round(uR);                        // how precisely that restock was seen
           rec.rate = null;                                // new batch: relearn sell speed
         } else if (hadPrev && rec.q > 0 && q < rec.q && upd > rec.t) {
           const r = (rec.q - q) / ((upd - rec.t) / 60);   // items per minute
           rec.rate = Math.round((rec.rate ? rec.rate * 0.5 + r * 0.5 : r) * 100) / 100;
         } else if (hadPrev && q > rec.q) {
           rec.lastRestock = Math.round((rec.t + upd) / 2); // topped up without emptying
+          rec.lrU = null;                                  // not a clean batch: do not time it
         }
         rec.emptyMid = null; rec.emptyUnc = null;
       } else if (hadPrev && rec.q > 0) {
         rec.emptyMid = Math.round((rec.t + upd) / 2);     // sold out between the two sightings
         rec.emptyUnc = Math.round((upd - rec.t) / 2);
+        if (rec.lastRestock != null && rec.lrU != null) {
+          const d = rec.emptyMid - rec.lastRestock;
+          const u = rec.emptyUnc + rec.lrU;
+          if (d > 0 && u <= MAX_UNCERTAINTY) {
+            rec.spans.push({ d: Math.round(d), u: Math.round(u) });
+            if (rec.spans.length > MAX_DELAYS) rec.spans.shift();
+          }
+        }
       } else if (!hadPrev) {
         rec.emptyMid = null; rec.emptyUnc = null;         // first sighting already empty: unknown
       }
