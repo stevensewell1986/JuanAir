@@ -95,6 +95,12 @@ async function main() {
     if (i < POLLS - 1) await new Promise((res) => setTimeout(res, GAP_MS));
   }
   if (!ok) { console.error('No successful polls - leaving the data file untouched.'); process.exit(1); }
+  // Starter averages (restock gap "g" and time to sell out "s", in seconds, with a reliability "r"),
+  // used by the userscript only until this collector has seen real cycles for the item.
+  try {
+    const seeds = JSON.parse(fs.readFileSync(require('path').join(__dirname, 'seeds.json'), 'utf8'));
+    for (const k of Object.keys(state.items || {})) { if (seeds[k]) state.items[k].seed = seeds[k]; else delete state.items[k].seed; }
+  } catch (e) { console.error('seeds not loaded:', e.message); }
   state.v = 1;
   state.updated = Math.floor(Date.now() / 1000);
   fs.writeFileSync(FILE, JSON.stringify(state));
