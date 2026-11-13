@@ -2,6 +2,10 @@ name: Restock collector
 
 # Watches YATA's foreign stock feed and publishes restock.json on the "data" branch.
 # The JuanAir userscript reads that one file.
+#
+# GitHub's own timer is unreliable for short intervals, so each run starts the next one
+# when it finishes. The timer below is only a safety net that restarts the chain if it stops.
+# Only one run is ever active at a time (see "concurrency").
 
 on:
   schedule:
@@ -10,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: restock-collector
@@ -45,3 +50,11 @@ jobs:
           git add restock.json
           git commit -qm "Restock data"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+
+      - name: Start the next run
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ job.status }}" != "success" ]; then sleep 120; fi
+          gh workflow run restock-collector.yml --repo "${{ github.repository }}" --ref main
