@@ -1,7 +1,7 @@
 name: Restock collector
 
 # Watches YATA's foreign stock feed and weav3r.dev bazaar prices, and publishes restock.json
-# plus one small price-history file per item (hist/) on the "data" branch.
+# on the "data" branch.
 # The JuanAir userscript reads that one file.
 #
 # GitHub's own timer is unreliable for short intervals, so each run starts the next one
@@ -36,6 +36,7 @@ jobs:
           mkdir -p data
           if git fetch --depth 1 origin data 2>/dev/null; then
             git archive FETCH_HEAD | tar -x -C data
+            rm -rf data/hist   # price history is no longer kept
           fi
           [ -s data/restock.json ] || echo '{}' > data/restock.json
 
