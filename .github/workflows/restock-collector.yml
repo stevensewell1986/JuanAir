@@ -1,6 +1,7 @@
 name: Restock collector
 
-# Watches YATA's foreign stock feed and publishes restock.json on the "data" branch.
+# Watches YATA's foreign stock feed and weav3r.dev bazaar prices, and publishes restock.json
+# plus one small price-history file per item (hist/) on the "data" branch.
 # The JuanAir userscript reads that one file.
 #
 # GitHub's own timer is unreliable for short intervals, so each run starts the next one
@@ -32,22 +33,22 @@ jobs:
 
       - name: Load what has been learned so far
         run: |
+          mkdir -p data
           if git fetch --depth 1 origin data 2>/dev/null; then
-            git show FETCH_HEAD:restock.json > restock.json || echo '{}' > restock.json
-          else
-            echo '{}' > restock.json
+            git archive FETCH_HEAD | tar -x -C data
           fi
+          [ -s data/restock.json ] || echo '{}' > data/restock.json
 
-      - name: Watch YATA
-        run: node collector/collect.js restock.json
+      - name: Watch YATA and check bazaar prices
+        run: node collector/collect.js data/restock.json
 
-      - name: Publish restock.json to the data branch
+      - name: Publish the data branch
         run: |
-          mkdir out && cp restock.json out/ && cd out
+          cd data
           git init -q -b data
           git config user.name "restock-collector"
           git config user.email "restock-collector@users.noreply.github.com"
-          git add restock.json
+          git add -A
           git commit -qm "Restock data"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
 
